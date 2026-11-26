@@ -1,0 +1,2169 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>霧鎖江船・十萬箭求生（國小國語融入版）</title>
+  <!-- 載入 Tailwind CSS 與古風中文字體 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700;900&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink-dark: #0f172a;
+      --paper-bg: #f6efe0;
+      --paper-border: #b89b6a;
+      --seal-red: #b91c1c;
+      --jade-green: #15803d;
+      --gold-accent: #d97706;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Noto Sans TC', sans-serif;
+      background: radial-gradient(circle at top, #1e293b 0%, #0b1320 100%);
+      color: #f8fafc;
+      overflow: hidden;
+      height: 100dvh;
+      width: 100vw;
+    }
+
+    .font-serif-tc {
+      font-family: 'Noto Serif TC', serif;
+    }
+
+    /* 古風卷軸卡片樣式 */
+    .scroll-panel {
+      background: linear-gradient(180deg, #fbf6ea 0%, #f1e5cd 100%);
+      color: #292016;
+      border: 3px solid #9c7c49;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55), inset 0 0 18px rgba(156, 124, 73, 0.28);
+    }
+
+    /* 遊戲專用立體按鈕 */
+    .game-btn {
+      position: relative;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.15s ease;
+      box-shadow: 0 5px 0 rgba(0, 0, 0, 0.45), 0 8px 18px rgba(0, 0, 0, 0.35);
+    }
+    .game-btn:hover {
+      filter: brightness(1.07);
+    }
+    .game-btn:active, .game-btn.active-press {
+      transform: translateY(4px);
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.45), 0 3px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    /* 遊戲主畫布 */
+    #gameCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+    #gameCanvas:active {
+      cursor: grabbing;
+    }
+
+    /* 警報閃爍動畫 */
+    @keyframes pulseDanger {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      50% { box-shadow: 0 0 18px 4px rgba(239, 68, 68, 0.9); }
+    }
+    .danger-pulse {
+      animation: pulseDanger 0.9s infinite;
+    }
+
+    /* 題目彈出動畫 */
+    @keyframes slideUpPop {
+      0% { opacity: 0; transform: translate(-50%, 24px) scale(0.95); }
+      100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    }
+    .quiz-pop {
+      animation: slideUpPop 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    /* 隱藏捲軸但保留捲動功能（結算畫面用） */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-between">
+
+  <!-- ==================== 頂部 HUD 狀態列 ==================== -->
+  <header id="hudBar" class="hidden w-full max-w-5xl px-2 sm:px-4 pt-2 pb-1 z-20 shrink-0">
+    <div class="bg-slate-900/85 backdrop-blur-md border border-amber-500/40 rounded-2xl px-3 py-2 shadow-xl flex flex-wrap items-center justify-between gap-2">
+      <!-- 箭數與目標 -->
+      <div class="flex items-center gap-2 min-w-[140px] flex-1">
+        <div class="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-xl">🏹</div>
+        <div class="flex-1">
+          <div class="flex items-baseline justify-between text-xs text-amber-200/90 font-semibold">
+            <span>已借箭數</span>
+            <span id="comboBadge" class="hidden px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[11px]">x1.0</span>
+          </div>
+          <div class="flex items-baseline gap-1">
+            <span id="arrowCountText" class="text-base sm:text-lg font-black text-amber-300 tabular-nums">0</span>
+            <span class="text-xs text-slate-400">/ <span id="arrowTargetText">100,000</span></span>
+          </div>
+          <div class="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden mt-0.5">
+            <div id="arrowProgressBar" class="h-full bg-gradient-to-r from-amber-400 to-yellow-200 transition-all duration-150" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 三大生存指標：耐久度 HP、船身平衡、濃霧掩護 -->
+      <div class="flex items-center gap-2 sm:gap-3 flex-[2] justify-center flex-wrap">
+        <!-- HP -->
+        <div id="hpBox" class="bg-slate-800/90 border border-slate-700 rounded-xl px-2.5 py-1 min-w-[92px] sm:min-w-[115px]">
+          <div class="flex justify-between text-[11px] font-bold">
+            <span class="text-rose-300">❤️ 船體</span>
+            <span id="hpText" class="tabular-nums text-white">100</span>
+          </div>
+          <div class="w-full h-2 bg-slate-700 rounded-full overflow-hidden mt-1">
+            <div id="hpBar" class="h-full bg-gradient-to-r from-rose-600 to-emerald-400 transition-all duration-150" style="width: 100%"></div>
+          </div>
+        </div>
+
+        <!-- 船身平衡度 -->
+        <div id="balanceBox" class="bg-slate-800/90 border border-slate-700 rounded-xl px-2.5 py-1 min-w-[110px] sm:min-w-[135px]">
+          <div class="flex justify-between text-[11px] font-bold">
+            <span class="text-sky-300">⚖️ 平衡</span>
+            <span id="balanceStateText" class="text-emerald-300">平穩</span>
+          </div>
+          <div class="relative w-full h-2 bg-slate-700 rounded-full overflow-hidden mt-1">
+            <!-- 安全區標示 -->
+            <div class="absolute inset-y-0 left-[22%] right-[22%] bg-emerald-500/30"></div>
+            <div class="absolute inset-y-0 left-1/2 w-0.5 bg-white/60 -translate-x-1/2"></div>
+            <!-- 平衡指針 -->
+            <div id="balancePointer" class="absolute top-0 bottom-0 w-2.5 bg-amber-300 rounded-full shadow transition-all duration-75" style="left: calc(50% - 5px)"></div>
+          </div>
+        </div>
+
+        <!-- 濃霧掩護 -->
+        <div id="fogBox" class="bg-slate-800/90 border border-slate-700 rounded-xl px-2.5 py-1 min-w-[92px] sm:min-w-[115px]">
+          <div class="flex justify-between text-[11px] font-bold">
+            <span class="text-cyan-200">🌫️ 濃霧</span>
+            <span id="fogText" class="tabular-nums text-cyan-100">90%</span>
+          </div>
+          <div class="w-full h-2 bg-slate-700 rounded-full overflow-hidden mt-1">
+            <div id="fogBar" class="h-full bg-gradient-to-r from-slate-400 to-cyan-200 transition-all duration-150" style="width: 90%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 剩餘時間與音效開關 -->
+      <div class="flex items-center gap-2">
+        <div class="bg-slate-800/90 border border-amber-500/30 rounded-xl px-2.5 py-1 text-center min-w-[64px]">
+          <div class="text-[10px] text-slate-400 leading-none">剩餘時間</div>
+          <div id="timerText" class="text-base font-black text-white tabular-nums mt-0.5">80s</div>
+        </div>
+        <button id="muteBtn" title="開啟／關閉音效" class="game-btn w-10 h-10 rounded-xl bg-slate-800 border border-slate-600 flex items-center justify-center text-lg">
+          🔊
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== 中央江面遊戲舞台 ==================== -->
+  <main class="relative flex-1 w-full max-w-5xl px-2 sm:px-4 py-1 flex items-center justify-center overflow-hidden">
+    <div id="stageContainer" class="relative w-full h-full rounded-2xl overflow-hidden border-2 border-amber-600/50 shadow-2xl bg-[#0c1e2e]">
+      <!-- 主遊戲 Canvas -->
+      <canvas id="gameCanvas"></canvas>
+
+      <!-- 角色即時對話氣泡（左上角，不遮擋中央） -->
+      <div id="dialogueBox" class="hidden pointer-events-none absolute top-3 left-3 max-w-[270px] sm:max-w-xs bg-slate-950/85 border border-amber-400/60 rounded-2xl p-2.5 shadow-xl flex items-center gap-2.5 z-20 transition-opacity duration-300">
+        <div id="dialogueAvatar" class="w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-xl bg-amber-900/60 border border-amber-400"></div>
+        <div class="min-w-0">
+          <div id="dialogueSpeaker" class="text-xs font-bold text-amber-300">諸葛亮</div>
+          <div id="dialogueText" class="text-xs sm:text-sm text-slate-100 leading-snug">江霧正濃，快駛入曹軍射擊區借箭！</div>
+        </div>
+      </div>
+
+      <!-- 增益／狀態提示標籤（右上角） -->
+      <div id="statusBadges" class="pointer-events-none absolute top-3 right-3 flex flex-col items-end gap-1.5 z-20"></div>
+
+      <!-- ==================== 即時國語挑戰卡片（下方浮動，不遮主視線） ==================== -->
+      <div id="quizCard" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 w-[95%] max-w-2xl scroll-panel rounded-2xl p-3 sm:p-4 z-30 quiz-pop">
+        <div class="flex items-center justify-between gap-2 mb-1.5">
+          <div class="flex items-center gap-2">
+            <span id="quizBadge" class="px-2 py-0.5 rounded-full text-xs font-black bg-red-700 text-amber-100">🔥 緊急滅火</span>
+            <span id="quizCategory" class="text-xs font-bold text-amber-900/80">形音義辨析</span>
+          </div>
+          <div class="flex items-center gap-1.5 text-xs font-bold text-red-800">
+            <span>⏱️</span>
+            <span id="quizTimerText" class="tabular-nums">5.0s</span>
+          </div>
+        </div>
+        <!-- 倒數進度條 -->
+        <div class="w-full h-1.5 bg-amber-900/20 rounded-full overflow-hidden mb-2">
+          <div id="quizTimerBar" class="h-full bg-gradient-to-r from-red-600 to-amber-500 transition-all duration-75" style="width: 100%"></div>
+        </div>
+        <!-- 題幹 -->
+        <p id="quizQuestion" class="text-sm sm:text-base font-bold text-stone-900 leading-snug mb-2.5"></p>
+        <!-- 三個快速選項 -->
+        <div id="quizOptions" class="grid grid-cols-3 gap-2"></div>
+      </div>
+
+      <!-- 簡短答題回饋提示條 -->
+      <div id="quizFeedbackToast" class="hidden pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full font-bold text-sm shadow-xl z-30 border"></div>
+    </div>
+  </main>
+
+  <!-- ==================== 底部操作按鈕列（置於 Canvas 外） ==================== -->
+  <footer id="controlsBar" class="hidden w-full max-w-5xl px-3 pb-3 pt-1 z-20 shrink-0">
+    <div class="flex items-center justify-center gap-3 sm:gap-5">
+      <!-- 掉頭按鈕 -->
+      <button id="turnBtn" class="game-btn flex-1 max-w-[210px] py-2.5 sm:py-3 px-4 rounded-2xl bg-gradient-to-b from-sky-500 to-blue-700 border-2 border-sky-300 text-white font-black text-sm sm:text-base flex items-center justify-center gap-2">
+        <span class="text-lg">🔄</span>
+        <span>船身掉頭</span>
+        <span class="hidden sm:inline text-xs font-normal bg-black/25 px-1.5 py-0.5 rounded">空白鍵</span>
+      </button>
+
+      <!-- 擂鼓嘲諷按鈕（按住生效） -->
+      <button id="drumBtn" class="game-btn flex-1 max-w-[210px] py-2.5 sm:py-3 px-4 rounded-2xl bg-gradient-to-b from-amber-500 to-red-700 border-2 border-amber-300 text-white font-black text-sm sm:text-base flex items-center justify-center gap-2">
+        <span class="text-lg">🥁</span>
+        <span>按住擂鼓</span>
+        <span class="hidden sm:inline text-xs font-normal bg-black/25 px-1.5 py-0.5 rounded">Shift</span>
+      </button>
+
+      <!-- 方向提示（桌機版顯示） -->
+      <div class="hidden md:flex items-center gap-2 text-xs text-slate-300 bg-slate-900/70 border border-slate-700 rounded-xl px-3 py-2">
+        <span>⌨️ WASD / 方向鍵 或 🖱️拖曳移船</span>
+        <span class="text-slate-500">|</span>
+        <span>答題可按 <b>1 2 3</b></span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==================== 開始畫面覆蓋層 ==================== -->
+  <div id="startOverlay" class="fixed inset-0 z-40 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
+    <div class="scroll-panel w-full max-w-xl rounded-3xl p-5 sm:p-7 text-center relative overflow-y-auto max-h-[95dvh] no-scrollbar">
+      <!-- 古風印章裝飾 -->
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-800 text-amber-100 text-xs font-bold tracking-widest mb-2">
+        <span>國小國語 × 三國生存</span>
+      </div>
+      <h1 class="font-serif-tc text-3xl sm:text-4xl font-black text-stone-900 tracking-wide">
+        霧鎖江船・十萬箭求生
+      </h1>
+      <p class="text-xs sm:text-sm text-stone-600 mt-1 font-semibold">
+        「江霧起，戰鼓鳴，巧借曹軍十萬箭！」
+      </p>
+
+      <!-- 難度切換（中年級／高年級） -->
+      <div class="mt-4 bg-amber-900/10 border border-amber-900/20 rounded-2xl p-3">
+        <div class="text-xs font-bold text-amber-900 mb-2">選擇挑戰年級（調整國語題庫與節奏）</div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <button id="btnMidGrade" class="grade-btn game-btn py-2.5 px-3 rounded-xl border-2 font-bold text-sm transition bg-emerald-700 text-white border-emerald-400">
+            🌱 中年級模式
+            <div class="text-[11px] font-normal opacity-90 mt-0.5">基礎成語・常見形近字</div>
+          </button>
+          <button id="btnHighGrade" class="grade-btn game-btn py-2.5 px-3 rounded-xl border-2 font-bold text-sm transition bg-stone-200 text-stone-700 border-stone-400">
+            🔥 高年級模式
+            <div class="text-[11px] font-normal opacity-80 mt-0.5">進階語詞・文意判讀挑戰</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3句超簡短操作說明 -->
+      <div class="mt-4 text-left bg-white/65 border border-amber-900/20 rounded-2xl p-3.5 space-y-2 text-xs sm:text-sm text-stone-800">
+        <div class="flex items-start gap-2">
+          <span class="text-base">⛵</span>
+          <span><b>走位借箭與平衡</b>：用方向鍵／WASD 或拖曳草船駛入射擊區接箭，單側快傾斜時按<b>「掉頭」</b>換邊平衡！</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="text-base">🥁</span>
+          <span><b>擂鼓吸引箭雨</b>：按住<b>「擂鼓」</b>可大幅加速借箭，但小心引來<b>火箭與投石</b>，同時閃避江面暗礁！</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="text-base">📖</span>
+          <span><b>即時國語解危</b>：戰況變化時會跳出限時國語題，快速答對可<b>加厚濃霧、水霧滅火、穩住船身</b>！</span>
+        </div>
+      </div>
+
+      <!-- 開始按鈕 -->
+      <button id="startGameBtn" class="game-btn mt-5 w-full py-3.5 rounded-2xl bg-gradient-to-b from-red-700 to-red-900 border-2 border-amber-300 text-amber-100 font-serif-tc text-xl font-black tracking-widest">
+        開始借箭 🏹
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== 結算戰報畫面 ==================== -->
+  <div id="resultOverlay" class="hidden fixed inset-0 z-40 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
+    <div class="scroll-panel w-full max-w-xl rounded-3xl p-5 sm:p-6 text-center overflow-y-auto max-h-[95dvh] no-scrollbar">
+      <div id="resultBadge" class="inline-block px-3 py-1 rounded-full text-xs font-black tracking-wider bg-amber-700 text-amber-100 mb-1">
+        借箭戰報
+      </div>
+      <h2 id="resultTitle" class="font-serif-tc text-2xl sm:text-3xl font-black text-stone-900">大獲全勝！</h2>
+      <p id="resultSubtitle" class="text-xs sm:text-sm text-stone-700 mt-1 font-semibold"></p>
+
+      <!-- 核心數據格 -->
+      <div class="grid grid-cols-3 gap-2 mt-4">
+        <div class="bg-white/75 border border-amber-900/20 rounded-2xl p-2.5">
+          <div class="text-[11px] text-stone-500 font-bold">總借箭數</div>
+          <div id="resArrows" class="text-lg sm:text-xl font-black text-amber-800 tabular-nums">0</div>
+        </div>
+        <div class="bg-white/75 border border-amber-900/20 rounded-2xl p-2.5">
+          <div class="text-[11px] text-stone-500 font-bold">國語答對率</div>
+          <div id="resAccuracy" class="text-lg sm:text-xl font-black text-emerald-700 tabular-nums">100%</div>
+        </div>
+        <div class="bg-white/75 border border-amber-900/20 rounded-2xl p-2.5">
+          <div class="text-[11px] text-stone-500 font-bold">生存評價</div>
+          <div id="resRank" class="text-lg sm:text-xl font-black text-red-700">S 級</div>
+        </div>
+      </div>
+
+      <!-- 動態國語戰報 -->
+      <div class="mt-3.5 text-left bg-amber-900/10 border border-amber-900/25 rounded-2xl p-3.5">
+        <div class="text-xs font-black text-amber-900 mb-1">📜 軍師借箭戰報</div>
+        <p id="resReportText" class="text-xs sm:text-sm text-stone-800 leading-relaxed"></p>
+      </div>
+
+      <!-- 修辭／成語賞析與小挑戰 -->
+      <div class="mt-3 text-left bg-white/80 border border-amber-900/25 rounded-2xl p-3.5">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-black text-red-800">✨ 戰後國語小賞析</span>
+          <span id="resRhetoricTag" class="text-[11px] px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold">修辭挑戰</span>
+        </div>
+        <p id="resRhetoricText" class="text-xs sm:text-sm text-stone-800 font-semibold leading-snug"></p>
+        <div id="resBonusOptions" class="grid grid-cols-2 gap-2 mt-2.5"></div>
+        <p id="resBonusFeedback" class="hidden text-xs font-bold mt-2"></p>
+      </div>
+
+      <!-- 操作按鈕 -->
+      <div class="grid grid-cols-2 gap-3 mt-4">
+        <button id="changeGradeBtn" class="game-btn py-3 rounded-2xl bg-stone-600 border-2 border-stone-400 text-white font-bold text-sm sm:text-base">
+          返回選單
+        </button>
+        <button id="playAgainBtn" class="game-btn py-3 rounded-2xl bg-gradient-to-b from-red-700 to-red-900 border-2 border-amber-300 text-amber-100 font-black text-sm sm:text-base">
+          再玩一次 🏹
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 遊戲主程式邏輯 ==================== -->
+  <script>
+    /*************************************************************************
+     * 1. 遊戲設定中心（GAME_CONFIG）
+     * 老師或開發者可直接修改此區塊數值，快速調整遊戲難度與節奏
+     *************************************************************************/
+    const GAME_CONFIG = {
+      // 目標箭數（設定為 100,000 支，搭配每次接箭代表「一整排草人受箭」的數值縮放，約 60~75 秒可達標）
+      targetArrows: 100000,
+      modes: {
+        mid: {
+          label: '中年級模式',
+          gameDuration: 85,          // 遊戲秒數
+          arrowsPerHit: 1600,        // 單次接箭基礎箭數（配合連擊最高可達 3 倍）
+          quizTimeLimit: 5.5,        // 國語答題秒數
+          quizInterval: 10.5,        // 一般語文事件觸發間隔（秒）
+          fogDecayPerSec: 1.05,      // 濃霧每秒消散量
+          arrowSpawnRate: 0.72,      // 基礎箭雨間隔（秒，越小越密）
+          reefSpawnRate: 4.4,        // 暗礁出現間隔（秒）
+          rockChance: 0.08,          // 投石基礎機率
+          fireBaseChance: 0.10,      // 火箭基礎機率
+          tiltPerArrow: 5.8          // 單次接箭造成的傾斜值（達 ±100 翻船）
+        },
+        high: {
+          label: '高年級模式',
+          gameDuration: 75,
+          arrowsPerHit: 1450,
+          quizTimeLimit: 4.5,
+          quizInterval: 9.0,
+          fogDecayPerSec: 1.35,
+          arrowSpawnRate: 0.62,
+          reefSpawnRate: 3.4,
+          rockChance: 0.13,
+          fireBaseChance: 0.15,
+          tiltPerArrow: 6.8
+        }
+      }
+    };
+
+    /*************************************************************************
+     * 2. 國小國語題庫模組（MANDARIN_BANK）
+     * 題型 category：
+     *   - 'idiom'：成語與詞彙辨識（答對加厚濃霧＋接箭倍率加成）
+     *   - 'char' ：形音義／易混淆字辨析（起火時觸發「水霧滅火」；傾斜時觸發「穩住船身」）
+     *   - 'clue' ：文意線索判讀（答對預判威脅＋護盾／濃霧增益）
+     * 欲新增題目只需依相同格式加入陣列即可。
+     *************************************************************************/
+    const MANDARIN_BANK = {
+      mid: {
+        idiom: [
+          {
+            prompt: '此刻長江上「大霧瀰漫」，這個成語最適合形容什麼景象？',
+            options: ['濃霧籠罩江面', '陽光普照大地', '江水乾涸見底'],
+            answer: 0,
+            explain: '「大霧瀰漫」形容濃密的霧氣佈滿整個空間。'
+          },
+          {
+            prompt: '曹軍弓箭手「萬箭齊發」，意思是箭矢如何射出？',
+            options: ['一根一根慢慢射', '無數支箭同時射出', '箭矢全部掉進水裡'],
+            answer: 1,
+            explain: '「萬箭齊發」形容極多的箭同時發射，聲勢浩大。'
+          },
+          {
+            prompt: '江面目前「風平浪靜」，代表天氣與水勢如何？',
+            options: ['狂風暴雨大作', '平靜無風無浪', '冰天雪地結冰'],
+            answer: 1,
+            explain: '「風平浪靜」指沒有風浪，水面十分平靜。'
+          },
+          {
+            prompt: '我們趁著順風划船離開，正好符合哪一個成語？',
+            options: ['順水推舟', '畫蛇添足', '守株待兔'],
+            answer: 0,
+            explain: '「順水推舟」比喻順應情勢行事，輕鬆達成目的。'
+          },
+          {
+            prompt: '敵軍突然射來火箭，讓人「措手不及」，意思是？',
+            options: ['早有準備很輕鬆', '太突然來不及應付', '忘記帶武器出門'],
+            answer: 1,
+            explain: '「措手不及」指事情來得太突然，來不及處理。'
+          },
+          {
+            prompt: '諸葛亮料事如神，大家稱讚他「神機妙算」，意思是？',
+            options: ['力氣非常大', '計謀非常高明', '跑得非常快'],
+            answer: 1,
+            explain: '「神機妙算」形容驚人的智慧與精準的計謀。'
+          }
+        ],
+        char: [
+          {
+            prompt: '稻草人著火了！快選出正確的詞語來「＿＿」火勢：',
+            options: ['撲滅', '僕滅', '樸滅'],
+            answer: 0,
+            explain: '用手或水把火打滅是「撲（提手旁）」滅。'
+          },
+          {
+            prompt: '草船一邊太重，船身開始「＿＿斜」了！哪個字才對？',
+            options: ['傾', '頃', '項'],
+            answer: 0,
+            explain: '偏向一邊是「傾（人部）」斜。'
+          },
+          {
+            prompt: '我們用「＿＿草」紮成假人來借箭，哪個字正確？',
+            options: ['稻', '蹈', '滔'],
+            answer: 0,
+            explain: '農作物稻子是禾部的「稻」草。'
+          },
+          {
+            prompt: '江面上飄起一片「＿＿霧」，選出正確用字：',
+            options: ['濃', '農', '膿'],
+            answer: 0,
+            explain: '霧氣很厚重，使用水部的「濃」霧。'
+          },
+          {
+            prompt: '快把船身穩住，別再左右「＿＿晃」了！',
+            options: ['搖', '遙', '謠'],
+            answer: 0,
+            explain: '擺動、晃動是手部的「搖」晃。'
+          },
+          {
+            prompt: '魯肅看見火箭非常「＿＿急」，哪個字才對？',
+            options: ['焦', '蕉', '礁'],
+            answer: 0,
+            explain: '心裡著急像被火烤一樣，是火部的「焦」急。'
+          }
+        ],
+        clue: [
+          {
+            prompt: '斥候回報：「江面霧氣漸散，曹操似已察覺有詐！」代表接下來要小心？',
+            options: ['曹軍改射火箭', '敵軍送來食物', '江水瞬間結冰'],
+            answer: 0,
+            explain: '濃霧散去後曹操看清草船，極可能改射火箭焚船！'
+          },
+          {
+            prompt: '魯肅大喊：「左邊稻草人已插滿箭，船快翻啦！」此時最該怎麼做？',
+            options: ['立刻掉頭換右邊', '繼續停在原地', '把箭拔掉丟水裡'],
+            answer: 0,
+            explain: '單側太重時要掉頭讓另一側受箭，才能恢復平衡。'
+          },
+          {
+            prompt: '孔明笑道：「曹軍生性多疑，濃霧中必不敢出兵！」表示我們可以？',
+            options: ['放心擂鼓引箭', '立刻棄船游泳', '上岸找曹操喝茶'],
+            answer: 0,
+            explain: '曹操多疑不敢輕易派船出擊，只敢遠距離放箭。'
+          },
+          {
+            prompt: '水手高呼：「前方水面冒出黑色石塊，快閃開！」那是什麼危險？',
+            options: ['江中暗礁', '巨大的魚群', '漂浮的木箱'],
+            answer: 0,
+            explain: '水面下的尖銳石塊稱為「暗礁」，撞上會損壞船體。'
+          }
+        ]
+      },
+      high: {
+        idiom: [
+          {
+            prompt: '曹操聽見鼓聲以為有伏兵，不敢出擊，這正是「草木皆兵」的寫照，意指？',
+            options: ['士兵躲在草叢裡', '疑神疑鬼、驚恐萬分', '軍隊裝備非常精良'],
+            answer: 1,
+            explain: '「草木皆兵」形容極度疑慮恐慌，把草木都當成敵軍。'
+          },
+          {
+            prompt: '諸葛亮這場借箭計畫「滴水不漏」，最適合形容計畫如何？',
+            options: ['船底沒有破洞漏水', '周密嚴謹、毫無破綻', '江水非常清澈透明'],
+            answer: 1,
+            explain: '「滴水不漏」比喻做事或計畫非常周密，沒有疏漏。'
+          },
+          {
+            prompt: '面對火攻與巨浪，我們沉著應對終於「化險為夷」，意思是？',
+            options: ['把危險轉化為平安', '把船開到國外去', '讓敵人變得更危險'],
+            answer: 0,
+            explain: '「化險為夷」指克服艱險，轉危為安。'
+          },
+          {
+            prompt: '「大霧瀰漫」中的「瀰」字，正確的讀音與意思最接近？',
+            options: ['ㄇㄧˊ，充滿、遍布', 'ㄋㄧˊ，泥濘不堪', 'ㄇㄧˇ，細小微弱'],
+            answer: 0,
+            explain: '「瀰漫」讀作「ㄇㄧˊ ㄇㄢˋ」，意為水氣或煙霧布滿空間。'
+          },
+          {
+            prompt: '曹軍見船上插滿箭又急速離去，真是「望塵莫及」，意思是？',
+            options: ['灰塵太大看不到', '遠遠落後追趕不上', '箭矢全部射中灰塵'],
+            answer: 1,
+            explain: '「望塵莫及」形容遠遠落後，無法追上。'
+          },
+          {
+            prompt: '藉著東風與江流「乘風破浪」返航，表現出什麼氣勢？',
+            options: ['不畏艱難、勇往直前', '隨波逐流、放棄努力', '原地打轉、猶豫不決'],
+            answer: 0,
+            explain: '「乘風破浪」比喻排除萬難、奮勇前進的氣勢。'
+          }
+        ],
+        char: [
+          {
+            prompt: '火箭襲來！請選出「＿＿退」火勢並準備撤離的正確用字：',
+            options: ['擊／撤', '擊／澈', '繫／撤'],
+            answer: 0,
+            explain: '退兵離開是提手旁的「撤」退；「澈」用於清澈。'
+          },
+          {
+            prompt: '草船隨時保持高度「警＿＿」，哪一個字才是正確用字？',
+            options: ['戒', '界', '介'],
+            answer: 0,
+            explain: '防備注意稱為「警戒」。'
+          },
+          {
+            prompt: '船艙進水且船身搖晃，請選出正確的「船＿＿」用字：',
+            options: ['艙', '蒼', '滄'],
+            answer: 0,
+            explain: '船體內部的空間為舟部的「船艙」。'
+          },
+          {
+            prompt: '草人替我們「抵＿＿」了漫天箭雨，空格應填哪個字？',
+            options: ['擋', '檔', '噹'],
+            answer: 0,
+            explain: '阻攔、承受攻擊為提手旁的「抵擋」。'
+          },
+          {
+            prompt: '火勢即將「＿＿延」到整艘草船，選出正確用字：',
+            options: ['蔓', '漫', '慢'],
+            answer: 0,
+            explain: '火勢或藤蔓向四周延伸擴展，用「蔓延」。'
+          },
+          {
+            prompt: '江面霧氣「＿＿繞」不去，選出正確用字：',
+            options: ['繚', '遼', '療'],
+            answer: 0,
+            explain: '煙霧迴環纏繞使用糸部的「繚繞」。'
+          }
+        ],
+        clue: [
+          {
+            prompt: '斥候急報：「對岸火光乍現，濃煙沖天，似有火攻之勢！」關鍵警訊是？',
+            options: ['火光乍現（防火箭）', '江水東流（防退潮）', '鼓聲停歇（可休息）'],
+            answer: 0,
+            explain: '「火光乍現」暗示敵軍已點燃火箭，必須準備閃避或滅火。'
+          },
+          {
+            prompt: '孔明輕搖羽扇：「霧鎖大江，彼眾我寡，唯借天時方能克敵。」其中「天時」指？',
+            options: ['大霧與順風', '精良的盔甲', '曹操的援軍'],
+            answer: 0,
+            explain: '諸葛亮算準了長江大霧與風向，這正是「借天時」。'
+          },
+          {
+            prompt: '魯肅驚呼：「左舷吃水過深，恐有傾覆之虞！」句中「傾覆」意指？',
+            options: ['翻船沉沒', '加速前進', '箭矢用完'],
+            answer: 0,
+            explain: '「傾覆」即傾斜翻倒，必須立即掉頭平衡船身。'
+          },
+          {
+            prompt: '哨兵回報：「曹營擂鼓聲急，投石機已架設完畢！」此時應該？',
+            options: ['留意水面陰影閃避', '停船原地不動', '把帆收起來睡覺'],
+            answer: 0,
+            explain: '投石落點會先在水面出現陰影警示，必須靈活走位閃避。'
+          }
+        ]
+      }
+    };
+
+    // 結算畫面的修辭／成語小挑戰題庫
+    const RESULT_RHETORIC_CHALLENGES = [
+      {
+        tag: '譬喻修辭',
+        sentence: '「草船上的稻草人插滿羽箭，遠看宛如一隻隻巨大的刺蝟。」這句話主要運用了哪種修辭？',
+        options: ['譬喻法', '設問法'],
+        answer: 0,
+        feedback: '答對了！用「宛如」將插滿箭的草船比喻成刺蝟，正是「譬喻法」。'
+      },
+      {
+        tag: '誇飾修辭',
+        sentence: '「曹軍一聲令下，十萬支羽箭如傾盆大雨般瞬間遮蔽了整片天空！」這句話運用了哪種修辭來強化氣勢？',
+        options: ['誇飾法', '頂真法'],
+        answer: 0,
+        feedback: '太棒了！「遮蔽整片天空」刻意放大箭雨的聲勢，屬於「誇飾法」。'
+      },
+      {
+        tag: '成語應用',
+        sentence: '諸葛亮利用濃霧與草船不費一兵一卒借得十萬箭，最適合用哪句成語讚嘆他？',
+        options: ['神機妙算', '畫蛇添足'],
+        answer: 0,
+        feedback: '沒錯！「神機妙算」正是形容諸葛亮高深莫測的智慧與計謀。'
+      }
+    ];
+
+    /*************************************************************************
+     * 3. Web Audio API 音效合成器（SoundFX）
+     * 無需外部檔案，點擊畫面後自動解鎖音效
+     *************************************************************************/
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        return this.muted;
+      }
+
+      // 接箭「噗」聲（插進稻草的清脆悶響）
+      playArrowCatch(combo = 1) {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        const baseFreq = Math.min(280 + combo * 22, 620);
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(110, now + 0.08);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+        osc.connect(gain).connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.09);
+      }
+
+      // 戰鼓「咚」聲
+      playDrum() {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(135, now);
+        osc.frequency.exponentialRampToValueAtTime(48, now + 0.18);
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.connect(gain).connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.22);
+      }
+
+      // 船身掉頭水花聲
+      playTurn() {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.linearRampToValueAtTime(340, now + 0.14);
+        gain.gain.setValueAtTime(0.16, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        osc.connect(gain).connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.16);
+      }
+
+      // 受傷／著火／撞礁低沉警示
+      playDamage() {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(55, now + 0.25);
+        gain.gain.setValueAtTime(0.24, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+        osc.connect(gain).connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.28);
+      }
+
+      // 國語答對清脆古箏感雙音
+      playCorrect() {
+        if (this.muted || !this.ctx) return;
+        const notes = [523.25, 659.25, 783.99];
+        notes.forEach((freq, idx) => {
+          const now = this.ctx.currentTime + idx * 0.065;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+          osc.connect(gain).connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        });
+      }
+
+      // 國語答錯低音提示
+      playWrong() {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(190, now);
+        osc.frequency.linearRampToValueAtTime(130, now + 0.2);
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.connect(gain).connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.22);
+      }
+
+      // 過關凱旋音效
+      playVictory() {
+        if (this.muted || !this.ctx) return;
+        const melody = [523.25, 659.25, 783.99, 1046.5];
+        melody.forEach((freq, i) => {
+          const now = this.ctx.currentTime + i * 0.11;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.22, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+          osc.connect(gain).connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.36);
+        });
+      }
+    }
+
+    const soundFX = new SoundEngine();
+
+    /*************************************************************************
+     * 4. DOM 參照與遊戲狀態管理
+     *************************************************************************/
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const stageContainer = document.getElementById('stageContainer');
+
+    // HUD 元素
+    const hudBar = document.getElementById('hudBar');
+    const controlsBar = document.getElementById('controlsBar');
+    const arrowCountText = document.getElementById('arrowCountText');
+    const arrowTargetText = document.getElementById('arrowTargetText');
+    const arrowProgressBar = document.getElementById('arrowProgressBar');
+    const comboBadge = document.getElementById('comboBadge');
+    const hpText = document.getElementById('hpText');
+    const hpBar = document.getElementById('hpBar');
+    const hpBox = document.getElementById('hpBox');
+    const balancePointer = document.getElementById('balancePointer');
+    const balanceStateText = document.getElementById('balanceStateText');
+    const balanceBox = document.getElementById('balanceBox');
+    const fogText = document.getElementById('fogText');
+    const fogBar = document.getElementById('fogBar');
+    const fogBox = document.getElementById('fogBox');
+    const timerText = document.getElementById('timerText');
+    const statusBadges = document.getElementById('statusBadges');
+    const muteBtn = document.getElementById('muteBtn');
+
+    // 對話與語文卡片元素
+    const dialogueBox = document.getElementById('dialogueBox');
+    const dialogueAvatar = document.getElementById('dialogueAvatar');
+    const dialogueSpeaker = document.getElementById('dialogueSpeaker');
+    const dialogueText = document.getElementById('dialogueText');
+    const quizCard = document.getElementById('quizCard');
+    const quizBadge = document.getElementById('quizBadge');
+    const quizCategory = document.getElementById('quizCategory');
+    const quizTimerText = document.getElementById('quizTimerText');
+    const quizTimerBar = document.getElementById('quizTimerBar');
+    const quizQuestion = document.getElementById('quizQuestion');
+    const quizOptions = document.getElementById('quizOptions');
+    const quizFeedbackToast = document.getElementById('quizFeedbackToast');
+
+    // 覆蓋層與按鈕
+    const startOverlay = document.getElementById('startOverlay');
+    const resultOverlay = document.getElementById('resultOverlay');
+    const btnMidGrade = document.getElementById('btnMidGrade');
+    const btnHighGrade = document.getElementById('btnHighGrade');
+    const startGameBtn = document.getElementById('startGameBtn');
+    const turnBtn = document.getElementById('turnBtn');
+    const drumBtn = document.getElementById('drumBtn');
+    const playAgainBtn = document.getElementById('playAgainBtn');
+    const changeGradeBtn = document.getElementById('changeGradeBtn');
+
+    // 遊戲全域狀態
+    let selectedGrade = 'mid'; // 'mid' | 'high'
+    let gameRunning = false;
+    let lastTimestamp = 0;
+    let width = 800;
+    let height = 500;
+
+    // 動態遊戲實體與數據
+    let state = {};
+
+    // 輸入控制狀態
+    const keys = {};
+    let pointerDragging = false;
+    let pointerTarget = null;
+    let isDrumBtnHeld = false;
+
+    /*************************************************************************
+     * 5. 畫布自適應縮放（支援高解析度螢幕與視窗縮放）
+     *************************************************************************/
+    function resizeCanvas() {
+      const rect = stageContainer.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = Math.max(300, rect.width);
+      height = Math.max(260, rect.height);
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      // 若遊戲進行中，確保草船留在邊界內
+      if (state && state.boat) {
+        state.boat.x = Math.max(55, Math.min(width - 55, state.boat.x));
+        state.boat.y = Math.max(height * 0.22, Math.min(height - 45, state.boat.y));
+      }
+    }
+
+    /*************************************************************************
+     * 6. 初始化新局狀態
+     *************************************************************************/
+    function initGameState() {
+      const cfg = GAME_CONFIG.modes[selectedGrade];
+      state = {
+        cfg,
+        arrows: 0,
+        targetArrows: GAME_CONFIG.targetArrows,
+        hp: 100,
+        fog: 92,
+        balance: 0,          // -100（左舷傾覆）~ +100（右舷傾覆）
+        timeLeft: cfg.gameDuration,
+        combo: 0,
+        maxCombo: 0,
+        comboTimer: 0,
+        frenzyTimer: 0,      // 答對成語觸發的「借箭倍率加成」秒數
+        shieldTimer: 0,      // 答對線索觸發的「護盾」秒數
+        screenShake: 0,
+
+        // 草船本體
+        boat: {
+          x: width * 0.5,
+          y: height * 0.62,
+          vx: 0,
+          vy: 0,
+          facing: 1,         // 1 = 船頭朝右（左舷朝北受箭）；-1 = 船頭朝左（右舷朝北受箭）
+          turnAnim: 0,       // 掉頭視覺翻轉進度
+          leftArrows: 0,     // 左舷插箭視覺數量
+          rightArrows: 0,    // 右舷插箭視覺數量
+          isOnFire: false,
+          fireTimer: 0,
+          isDrumming: false,
+          drumPulseTimer: 0,
+          drumWaveRadius: 0
+        },
+
+        // 場上物件
+        projectiles: [],     // 羽箭、火箭
+        rocks: [],           // 投石（先有落點圈再砸落）
+        reefs: [],           // 江面暗礁
+        particles: [],       // 火焰、水霧、木屑粒子
+        floatingTexts: [],   // 浮動得分與提示文字
+        fogClouds: [],       // 視覺濃霧雲團
+
+        // 生成計時器
+        arrowSpawnTimer: 0.4,
+        reefSpawnTimer: 2.5,
+        quizCooldown: 5.0,
+        emergencyQuizCooldown: 0,
+        dialogueTimer: 0,
+        lastWarningType: '',
+
+        // 國語答題統計與進行中題目
+        activeQuiz: null,
+        quizCorrectCount: 0,
+        quizTotalCount: 0,
+        usedPrompts: new Set(),
+        hadFireCrisis: false,
+        hadTiltCrisis: false
+      };
+
+      // 初始化背景漂浮霧團
+      for (let i = 0; i < 12; i++) {
+        state.fogClouds.push({
+          x: Math.random() * width,
+          y: height * 0.14 + Math.random() * height * 0.8,
+          r: 70 + Math.random() * 95,
+          speed: 12 + Math.random() * 18,
+          alpha: 0.15 + Math.random() * 0.22
+        });
+      }
+
+      arrowTargetText.textContent = GAME_CONFIG.targetArrows.toLocaleString();
+      hideQuizCard();
+      showDialogue('kongming', '江霧正濃！快駛入上方曹軍射擊區借箭，注意船身平衡。', 4.5);
+      updateHUD();
+    }
+
+    /*************************************************************************
+     * 7. 角色即時台詞系統（諸葛亮 & 魯肅）
+     *************************************************************************/
+    function showDialogue(speaker, text, duration = 3.5) {
+      if (speaker === 'kongming') {
+        dialogueAvatar.textContent = '🪶';
+        dialogueAvatar.className = 'w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-xl bg-sky-900/80 border border-sky-400';
+        dialogueSpeaker.textContent = '諸葛亮';
+        dialogueSpeaker.className = 'text-xs font-bold text-sky-300';
+      } else {
+        dialogueAvatar.textContent = '😰';
+        dialogueAvatar.className = 'w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-xl bg-amber-900/80 border border-amber-400';
+        dialogueSpeaker.textContent = '魯肅';
+        dialogueSpeaker.className = 'text-xs font-bold text-amber-300';
+      }
+      dialogueText.textContent = text;
+      dialogueBox.classList.remove('hidden');
+      state.dialogueTimer = duration;
+    }
+
+    /*************************************************************************
+     * 8. 即時國語挑戰系統（輕量、不中斷、3~5秒快速作答）
+     *************************************************************************/
+    function triggerQuiz(modeType = 'normal') {
+      if (state.activeQuiz || !gameRunning) return;
+
+      const bank = MANDARIN_BANK[selectedGrade];
+      let category = 'idiom';
+      let badgeText = '🌫️ 濃霧加持';
+      let badgeClass = 'bg-cyan-700 text-cyan-50';
+      let catLabel = '成語與詞彙辨識';
+      let effect = 'fog_buff';
+
+      if (modeType === 'fire') {
+        category = 'char';
+        badgeText = '🔥 緊急水霧滅火';
+        badgeClass = 'bg-red-700 text-amber-100';
+        catLabel = '形音義辨析';
+        effect = 'extinguish';
+      } else if (modeType === 'tilt') {
+        category = 'char';
+        badgeText = '⚖️ 緊急穩住船身';
+        badgeClass = 'bg-amber-700 text-amber-50';
+        catLabel = '形音義辨析';
+        effect = 'stabilize';
+      } else {
+        // 一般事件：在成語辨識與文意線索之間輪替
+        if (Math.random() < 0.45) {
+          category = 'clue';
+          badgeText = '📜 軍情線索判讀';
+          badgeClass = 'bg-indigo-700 text-indigo-50';
+          catLabel = '文意線索判讀';
+          effect = 'clue_shield';
+        }
+      }
+
+      const pool = bank[category];
+      // 優先挑選尚未出過的題目
+      let candidates = pool.filter(q => !state.usedPrompts.has(q.prompt));
+      if (candidates.length === 0) {
+        pool.forEach(q => state.usedPrompts.delete(q.prompt));
+        candidates = pool;
+      }
+      const rawQ = candidates[Math.floor(Math.random() * candidates.length)];
+      state.usedPrompts.add(rawQ.prompt);
+
+      // 隨機打亂選項順序，避免答案永遠在第一個
+      const indexedOptions = rawQ.options.map((text, idx) => ({
+        text,
+        isCorrect: idx === rawQ.answer
+      }));
+      for (let i = indexedOptions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indexedOptions[i], indexedOptions[j]] = [indexedOptions[j], indexedOptions[i]];
+      }
+
+      const timeLimit = state.cfg.quizTimeLimit;
+      state.activeQuiz = {
+        prompt: rawQ.prompt,
+        options: indexedOptions,
+        explain: rawQ.explain,
+        effect,
+        timeLeft: timeLimit,
+        maxTime: timeLimit
+      };
+
+      // 渲染卡片
+      quizBadge.textContent = badgeText;
+      quizBadge.className = `px-2 py-0.5 rounded-full text-xs font-black ${badgeClass}`;
+      quizCategory.textContent = catLabel;
+      quizQuestion.textContent = rawQ.prompt;
+      quizOptions.innerHTML = '';
+
+      indexedOptions.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'game-btn py-2 px-2 sm:px-3 rounded-xl bg-white hover:bg-amber-50 border-2 border-amber-700/60 text-stone-900 font-bold text-xs sm:text-sm leading-tight flex items-center justify-center gap-1';
+        btn.innerHTML = `<span class="hidden sm:inline text-[11px] px-1.5 py-0.5 rounded bg-amber-800/15 text-amber-900 font-black">${idx + 1}</span><span>${opt.text}</span>`;
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          answerQuiz(idx);
+        });
+        quizOptions.appendChild(btn);
+      });
+
+      quizCard.classList.remove('hidden');
+    }
+
+    function answerQuiz(optionIndex) {
+      if (!state.activeQuiz) return;
+      const q = state.activeQuiz;
+      state.quizTotalCount++;
+
+      const isTimeout = optionIndex === -1;
+      const isCorrect = !isTimeout && q.options[optionIndex] && q.options[optionIndex].isCorrect;
+
+      if (isCorrect) {
+        state.quizCorrectCount++;
+        soundFX.playCorrect();
+        spawnFloatingText(state.boat.x, state.boat.y - 45, '✨ 神機妙算！', '#fde047', 22);
+
+        // 依題目類型給予立即戰場回饋
+        if (q.effect === 'extinguish') {
+          state.boat.isOnFire = false;
+          state.boat.fireTimer = 0;
+          state.hp = Math.min(100, state.hp + 10);
+          spawnWaterMistBurst(state.boat.x, state.boat.y);
+          showQuizToast(true, '💧 水霧滅火成功！船體 +10');
+          showDialogue('kongming', '妙哉！水霧已撲滅火勢，繼續借箭！', 2.8);
+        } else if (q.effect === 'stabilize') {
+          state.balance *= 0.25;
+          spawnWaterMistBurst(state.boat.x, state.boat.y);
+          showQuizToast(true, '⚖️ 船身已穩住！平衡大幅恢復');
+          showDialogue('lusu', '呼～好險穩住了，多虧先生鎮定指揮！', 2.8);
+        } else if (q.effect === 'clue_shield') {
+          state.fog = Math.min(100, state.fog + 18);
+          state.shieldTimer = 6.0;
+          showQuizToast(true, '🛡️ 洞悉軍情！濃霧 +18% 並獲得護盾');
+        } else {
+          state.fog = Math.min(100, state.fog + 22);
+          state.frenzyTimer = 6.5;
+          showQuizToast(true, '🌫️ 濃霧 +22%！6秒內借箭加倍！');
+        }
+      } else {
+        soundFX.playWrong();
+        spawnFloatingText(state.boat.x, state.boat.y - 45, isTimeout ? '⏱️ 逾時失機！' : '❌ 判斷失誤！', '#f87171', 20);
+
+        // 立即懲罰與簡短解析
+        if (q.effect === 'extinguish') {
+          state.hp = Math.max(0, state.hp - 8);
+          showQuizToast(false, `🔥 未能及時滅火！${q.explain}`);
+        } else if (q.effect === 'stabilize') {
+          state.balance += state.balance >= 0 ? 10 : -10;
+          showQuizToast(false, `⚠️ 船身劇烈搖晃！${q.explain}`);
+        } else {
+          state.fog = Math.max(0, state.fog - 10);
+          showQuizToast(false, `🌫️ 濃霧消散加快！${q.explain}`);
+        }
+      }
+
+      hideQuizCard();
+      state.quizCooldown = state.cfg.quizInterval;
+      state.emergencyQuizCooldown = 4.5;
+    }
+
+    function hideQuizCard() {
+      state.activeQuiz = null;
+      quizCard.classList.add('hidden');
+    }
+
+    let toastTimeout = null;
+    function showQuizToast(isSuccess, message) {
+      quizFeedbackToast.textContent = message;
+      quizFeedbackToast.className = `pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full font-bold text-xs sm:text-sm shadow-xl z-30 border max-w-[92%] text-center ${
+        isSuccess
+          ? 'bg-emerald-900/95 border-emerald-400 text-emerald-100'
+          : 'bg-red-950/95 border-red-400 text-red-100'
+      }`;
+      quizFeedbackToast.classList.remove('hidden');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        quizFeedbackToast.classList.add('hidden');
+      }, 2600);
+    }
+
+    /*************************************************************************
+     * 9. 玩家動作：掉頭與特效生成
+     *************************************************************************/
+    function triggerTurnaround() {
+      if (!gameRunning) return;
+      soundFX.init();
+      soundFX.playTurn();
+      state.boat.facing *= -1;
+      state.boat.turnAnim = 1.0;
+      const sideLabel = state.boat.facing === 1 ? '🔄 左舷受箭' : '🔄 右舷受箭';
+      spawnFloatingText(state.boat.x, state.boat.y - 36, sideLabel, '#7dd3fc', 16);
+      spawnWaterMistBurst(state.boat.x, state.boat.y, 8);
+    }
+
+    function spawnFloatingText(x, y, text, color = '#fde047', size = 16) {
+      state.floatingTexts.push({
+        x, y, text, color, size,
+        life: 1.0,
+        vy: -38
+      });
+    }
+
+    function spawnWaterMistBurst(x, y, count = 18) {
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+        const speed = 40 + Math.random() * 90;
+        state.particles.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          r: 4 + Math.random() * 6,
+          color: 'rgba(186, 230, 253, 0.85)',
+          life: 0.7 + Math.random() * 0.4
+        });
+      }
+    }
+
+    function spawnFireParticles(x, y, count = 3) {
+      for (let i = 0; i < count; i++) {
+        state.particles.push({
+          x: x + (Math.random() - 0.5) * 46,
+          y: y + (Math.random() - 0.5) * 16,
+          vx: (Math.random() - 0.5) * 24,
+          vy: -35 - Math.random() * 45,
+          r: 4 + Math.random() * 5,
+          color: Math.random() < 0.5 ? 'rgba(251, 146, 60, 0.9)' : 'rgba(239, 68, 68, 0.9)',
+          life: 0.45 + Math.random() * 0.25
+        });
+      }
+    }
+
+    /*************************************************************************
+     * 10. 遊戲主更新迴圈（物理、箭雨、暗礁、平衡與生存判定）
+     *************************************************************************/
+    function updateGame(rawDt) {
+      // 當語文題目出現時，將戰場時間微幅放慢至 0.55 倍，保持節奏不中斷又讓學生有餘裕閱讀
+      const timeScale = state.activeQuiz ? 0.55 : 1.0;
+      const dt = Math.min(rawDt, 0.05) * timeScale;
+      const realDt = Math.min(rawDt, 0.05);
+
+      const boat = state.boat;
+      const cfg = state.cfg;
+
+      // 1. 剩餘時間與濃霧自然消散
+      state.timeLeft = Math.max(0, state.timeLeft - dt);
+      state.fog = Math.max(0, state.fog - cfg.fogDecayPerSec * dt);
+      if (state.frenzyTimer > 0) state.frenzyTimer = Math.max(0, state.frenzyTimer - dt);
+      if (state.shieldTimer > 0) state.shieldTimer = Math.max(0, state.shieldTimer - dt);
+      if (state.comboTimer > 0) {
+        state.comboTimer -= dt;
+        if (state.comboTimer <= 0) state.combo = 0;
+      }
+      if (state.screenShake > 0) state.screenShake = Math.max(0, state.screenShake - realDt * 25);
+      if (state.dialogueTimer > 0) {
+        state.dialogueTimer -= realDt;
+        if (state.dialogueTimer <= 0) dialogueBox.classList.add('hidden');
+      }
+
+      // 2. 語文題目倒數計時（使用真實秒數）
+      if (state.activeQuiz) {
+        state.activeQuiz.timeLeft -= realDt;
+        const pct = Math.max(0, (state.activeQuiz.timeLeft / state.activeQuiz.maxTime) * 100);
+        quizTimerBar.style.width = `${pct}%`;
+        quizTimerText.textContent = `${Math.max(0, state.activeQuiz.timeLeft).toFixed(1)}s`;
+        if (state.activeQuiz.timeLeft <= 0) {
+          answerQuiz(-1); // 逾時未答
+        }
+      } else {
+        // 檢查是否觸發緊急或例行語文事件
+        if (state.emergencyQuizCooldown > 0) state.emergencyQuizCooldown -= realDt;
+        state.quizCooldown -= dt;
+
+        if (boat.isOnFire && state.emergencyQuizCooldown <= 0) {
+          triggerQuiz('fire');
+        } else if (Math.abs(state.balance) >= 62 && state.emergencyQuizCooldown <= 0) {
+          triggerQuiz('tilt');
+        } else if (state.quizCooldown <= 0) {
+          triggerQuiz('normal');
+        }
+      }
+
+      // 3. 擂鼓嘲諷狀態
+      boat.isDrumming = Boolean(keys['ShiftLeft'] || keys['ShiftRight'] || keys['KeyJ'] || isDrumBtnHeld);
+      drumBtn.classList.toggle('active-press', boat.isDrumming);
+      if (boat.isDrumming) {
+        boat.drumPulseTimer -= dt;
+        boat.drumWaveRadius += dt * 160;
+        if (boat.drumPulseTimer <= 0) {
+          boat.drumPulseTimer = 0.42;
+          boat.drumWaveRadius = 18;
+          soundFX.playDrum();
+        }
+      }
+
+      // 4. 草船移動（傾斜越嚴重，移動速度越慢）
+      const tiltPenalty = 1 - Math.min(0.55, (Math.abs(state.balance) / 100) * 0.55);
+      const maxSpeed = 275 * tiltPenalty;
+
+      let moveX = 0;
+      let moveY = 0;
+      if (keys['ArrowLeft'] || keys['KeyA']) moveX -= 1;
+      if (keys['ArrowRight'] || keys['KeyD']) moveX += 1;
+      if (keys['ArrowUp'] || keys['KeyW']) moveY -= 1;
+      if (keys['ArrowDown'] || keys['KeyS']) moveY += 1;
+
+      if (moveX !== 0 || moveY !== 0) {
+        const len = Math.hypot(moveX, moveY);
+        boat.vx = (moveX / len) * maxSpeed;
+        boat.vy = (moveY / len) * maxSpeed;
+        pointerTarget = null;
+      } else if (pointerDragging && pointerTarget) {
+        const dx = pointerTarget.x - boat.x;
+        const dy = pointerTarget.y - boat.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 6) {
+          const spd = Math.min(maxSpeed * 1.15, dist * 7);
+          boat.vx = (dx / dist) * spd;
+          boat.vy = (dy / dist) * spd;
+        } else {
+          boat.vx *= 0.7;
+          boat.vy *= 0.7;
+        }
+      } else {
+        boat.vx *= 0.85;
+        boat.vy *= 0.85;
+      }
+
+      boat.x += boat.vx * dt;
+      boat.y += boat.vy * dt;
+
+      // 限制草船在長江可航行範圍內
+      const minY = height * 0.21;
+      const maxY = height - 42;
+      boat.x = Math.max(54, Math.min(width - 54, boat.x));
+      boat.y = Math.max(minY, Math.min(maxY, boat.y));
+      if (boat.turnAnim > 0) boat.turnAnim = Math.max(0, boat.turnAnim - realDt * 4.5);
+
+      // 5. 起火持續扣血
+      if (boat.isOnFire) {
+        boat.fireTimer += dt;
+        state.hp = Math.max(0, state.hp - 4.8 * dt);
+        if (Math.random() < 0.45) spawnFireParticles(boat.x, boat.y, 1);
+      }
+
+      // 6. 曹軍箭雨與投石生成
+      const inShootZone = boat.y < height * 0.66;
+      const rateMultiplier = (boat.isDrumming ? 0.45 : 1.0) * (inShootZone ? 0.82 : 1.15);
+      state.arrowSpawnTimer -= dt;
+      if (state.arrowSpawnTimer <= 0) {
+        state.arrowSpawnTimer = cfg.arrowSpawnRate * rateMultiplier;
+        spawnArrowVolley();
+
+        // 投石機率（擂鼓或霧低時提高）
+        const rockProb = cfg.rockChance + (boat.isDrumming ? 0.1 : 0) + (state.fog < 35 ? 0.08 : 0);
+        if (Math.random() < rockProb) {
+          spawnRock();
+        }
+      }
+
+      // 7. 暗礁生成
+      state.reefSpawnTimer -= dt;
+      if (state.reefSpawnTimer <= 0) {
+        state.reefSpawnTimer = cfg.reefSpawnRate * (0.8 + Math.random() * 0.4);
+        state.reefs.push({
+          x: width + 40,
+          y: height * 0.26 + Math.random() * (height * 0.62),
+          r: 18 + Math.random() * 12,
+          speed: 65 + Math.random() * 45,
+          hitCooldown: 0
+        });
+      }
+
+      // 8. 更新箭矢與碰撞判定
+      for (let i = state.projectiles.length - 1; i >= 0; i--) {
+        const p = state.projectiles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+
+        // 判斷是否擊中草船（橢圓碰撞盒）
+        const dx = (p.x - boat.x) / 56;
+        const dy = (p.y - boat.y) / 26;
+        if (dx * dx + dy * dy <= 1) {
+          if (p.type === 'fire') {
+            handleFireArrowHit();
+          } else {
+            handleNormalArrowCatch(p);
+          }
+          state.projectiles.splice(i, 1);
+          continue;
+        }
+
+        if (p.y > height + 30 || p.x < -40 || p.x > width + 40) {
+          state.projectiles.splice(i, 1);
+        }
+      }
+
+      // 9. 更新投石（落點預警 -> 墜落）
+      for (let i = state.rocks.length - 1; i >= 0; i--) {
+        const r = state.rocks[i];
+        r.timer -= dt;
+        if (r.timer <= 0) {
+          // 落水判定是否砸中草船
+          const dist = Math.hypot(r.x - boat.x, r.y - boat.y);
+          if (dist < r.radius + 32) {
+            if (state.shieldTimer > 0) {
+              spawnFloatingText(boat.x, boat.y - 30, '🛡️ 護盾擋下投石！', '#93c5fd', 16);
+            } else {
+              state.hp = Math.max(0, state.hp - 18);
+              state.screenShake = 10;
+              soundFX.playDamage();
+              spawnFloatingText(boat.x, boat.y - 30, '💥 投石命中 -18', '#f87171', 18);
+            }
+          }
+          spawnWaterMistBurst(r.x, r.y, 12);
+          state.rocks.splice(i, 1);
+        }
+      }
+
+      // 10. 更新暗礁
+      for (let i = state.reefs.length - 1; i >= 0; i--) {
+        const reef = state.reefs[i];
+        reef.x -= reef.speed * dt;
+        if (reef.hitCooldown > 0) reef.hitCooldown -= dt;
+
+        const dist = Math.hypot(reef.x - boat.x, reef.y - boat.y);
+        if (dist < reef.r + 30 && reef.hitCooldown <= 0) {
+          reef.hitCooldown = 1.2;
+          if (state.shieldTimer > 0) {
+            spawnFloatingText(boat.x, boat.y - 25, '🛡️ 護盾防禦暗礁', '#93c5fd', 15);
+          } else {
+            state.hp = Math.max(0, state.hp - 12);
+            state.screenShake = 8;
+            soundFX.playDamage();
+            spawnFloatingText(boat.x, boat.y - 25, '🪨 撞上暗礁 -12', '#fb923c', 17);
+          }
+        }
+        if (reef.x < -50) state.reefs.splice(i, 1);
+      }
+
+      // 11. 更新粒子、漂浮字與霧氣
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const pt = state.particles[i];
+        pt.x += pt.vx * dt;
+        pt.y += pt.vy * dt;
+        pt.life -= dt;
+        if (pt.life <= 0) state.particles.splice(i, 1);
+      }
+
+      for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+        const ft = state.floatingTexts[i];
+        ft.y += ft.vy * dt;
+        ft.life -= realDt * 0.95;
+        if (ft.life <= 0) state.floatingTexts.splice(i, 1);
+      }
+
+      state.fogClouds.forEach(c => {
+        c.x += c.speed * dt;
+        if (c.x - c.r > width) c.x = -c.r;
+      });
+
+      // 12. 戰況語音提醒（低頻率觸發，避免洗頻）
+      if (Math.abs(state.balance) > 65 && state.lastWarningType !== 'tilt') {
+        state.lastWarningType = 'tilt';
+        state.hadTiltCrisis = true;
+        showDialogue('lusu', '孔明先生！船身快傾斜翻覆了，快按「船身掉頭」！', 3.5);
+      } else if (state.fog < 30 && state.lastWarningType !== 'fog') {
+        state.lastWarningType = 'fog';
+        showDialogue('kongming', '江霧漸散，曹操已起疑心，切記防備火箭！', 3.5);
+      } else if (Math.abs(state.balance) < 40 && state.fog >= 35) {
+        state.lastWarningType = '';
+      }
+
+      // 13. 檢查勝負條件
+      updateHUD();
+      if (state.arrows >= state.targetArrows) {
+        endGame('win');
+      } else if (Math.abs(state.balance) >= 100) {
+        endGame('capsize');
+      } else if (state.hp <= 0) {
+        endGame('destroyed');
+      } else if (state.timeLeft <= 0) {
+        endGame('timeout');
+      }
+    }
+
+    // 生成一波曹軍箭矢
+    function spawnArrowVolley() {
+      const cfg = state.cfg;
+      const boat = state.boat;
+      const count = boat.isDrumming ? 3 : 2;
+      // 濃霧越低、擂鼓越激烈，火箭比例越高
+      const fireProb = cfg.fireBaseChance + (state.fog < 40 ? 0.22 : 0) + (boat.isDrumming ? 0.12 : 0);
+
+      for (let i = 0; i < count; i++) {
+        // 讓箭矢大致朝向草船所在區域，方便走位接箭
+        const targetX = boat.x + (Math.random() - 0.5) * 260;
+        const startX = Math.max(20, Math.min(width - 20, targetX + (Math.random() - 0.5) * 90));
+        const startY = height * 0.13;
+        const isFire = Math.random() < fireProb;
+        const speed = isFire ? 235 : 210 + Math.random() * 55;
+        const angle = Math.atan2((height * 0.75) - startY, targetX - startX);
+
+        state.projectiles.push({
+          x: startX,
+          y: startY,
+          vx: Math.cos(angle) * speed * 0.45,
+          vy: Math.abs(Math.sin(angle)) * speed,
+          type: isFire ? 'fire' : 'normal'
+        });
+      }
+    }
+
+    function spawnRock() {
+      const targetX = Math.max(60, Math.min(width - 60, state.boat.x + (Math.random() - 0.5) * 140));
+      const targetY = Math.max(height * 0.25, Math.min(height - 50, state.boat.y + (Math.random() - 0.5) * 90));
+      state.rocks.push({
+        x: targetX,
+        y: targetY,
+        radius: 30,
+        timer: 1.55,
+        maxTimer: 1.55
+      });
+    }
+
+    // 接到普通羽箭
+    function handleNormalArrowCatch(p) {
+      const boat = state.boat;
+      state.combo++;
+      state.maxCombo = Math.max(state.maxCombo, state.combo);
+      state.comboTimer = 3.2;
+
+      const comboMult = Math.min(2.5, 1 + Math.floor(state.combo / 5) * 0.25);
+      const drumMult = boat.isDrumming ? 1.45 : 1.0;
+      const frenzyMult = state.frenzyTimer > 0 ? 1.8 : 1.0;
+      const gained = Math.round(state.cfg.arrowsPerHit * comboMult * drumMult * frenzyMult);
+
+      state.arrows = Math.min(state.targetArrows, state.arrows + gained);
+      soundFX.playArrowCatch(state.combo);
+
+      // 依船頭朝向，將箭矢重量加在左舷（-）或右舷（+）
+      if (boat.facing === 1) {
+        state.balance = Math.max(-100, state.balance - state.cfg.tiltPerArrow);
+        boat.leftArrows = Math.min(28, boat.leftArrows + 1);
+      } else {
+        state.balance = Math.min(100, state.balance + state.cfg.tiltPerArrow);
+        boat.rightArrows = Math.min(28, boat.rightArrows + 1);
+      }
+
+      const color = state.frenzyTimer > 0 ? '#fef08a' : '#fcd34d';
+      spawnFloatingText(p.x, p.y - 10, `+${gained.toLocaleString()}`, color, 15);
+    }
+
+    // 被火箭命中
+    function handleFireArrowHit() {
+      const boat = state.boat;
+      if (state.shieldTimer > 0) {
+        spawnFloatingText(boat.x, boat.y - 25, '🛡️ 護盾彈開火箭！', '#93c5fd', 16);
+        return;
+      }
+      state.hp = Math.max(0, state.hp - 10);
+      state.screenShake = 8;
+      soundFX.playDamage();
+      if (!boat.isOnFire) {
+        boat.isOnFire = true;
+        state.hadFireCrisis = true;
+        showDialogue('lusu', '糟了！稻草人起火了！快答對國語題喚來水霧！', 3.5);
+      }
+      spawnFloatingText(boat.x, boat.y - 25, '🔥 著火 -10', '#f87171', 18);
+    }
+
+    /*************************************************************************
+     * 11. 畫面繪製引擎（水墨長江、曹軍水寨、草船、羽箭、濃霧）
+     *************************************************************************/
+    function renderGame() {
+      ctx.save();
+
+      // 畫面震動效果
+      if (state.screenShake > 0) {
+        const sx = (Math.random() - 0.5) * state.screenShake;
+        const sy = (Math.random() - 0.5) * state.screenShake;
+        ctx.translate(sx, sy);
+      }
+
+      // 1. 江面漸層背景
+      const waterGrad = ctx.createLinearGradient(0, 0, 0, height);
+      waterGrad.addColorStop(0, '#102130');
+      waterGrad.addColorStop(0.22, '#133144');
+      waterGrad.addColorStop(1, '#0b2233');
+      ctx.fillStyle = waterGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // 水波紋動畫
+      const timeSec = performance.now() * 0.001;
+      ctx.strokeStyle = 'rgba(148, 197, 224, 0.12)';
+      ctx.lineWidth = 1.5;
+      for (let row = 0; row < 8; row++) {
+        const y = height * 0.22 + row * ((height * 0.75) / 8);
+        ctx.beginPath();
+        for (let x = 0; x <= width; x += 40) {
+          const offset = Math.sin(x * 0.02 + timeSec * 1.8 + row) * 4;
+          if (x === 0) ctx.moveTo(x, y + offset);
+          else ctx.lineTo(x, y + offset);
+        }
+        ctx.stroke();
+      }
+
+      // 2. 曹軍射擊區虛線提示
+      const zoneY = height * 0.66;
+      ctx.save();
+      ctx.setLineDash([8, 8]);
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.28)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(16, zoneY);
+      ctx.lineTo(width - 16, zoneY);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(253, 224, 71, 0.5)';
+      ctx.font = 'bold 12px "Noto Sans TC", sans-serif';
+      ctx.fillText('▲ 曹軍射擊區（駛入此區借箭效率更高）', 18, zoneY - 7);
+      ctx.restore();
+
+      // 3. 北岸曹軍水寨剪影與火把
+      drawCaoCamp(timeSec);
+
+      // 4. 江面暗礁
+      state.reefs.forEach(reef => {
+        ctx.save();
+        ctx.translate(reef.x, reef.y);
+        // 水花外圈
+        ctx.strokeStyle = 'rgba(224, 242, 254, 0.38)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(0, 4, reef.r + 6, reef.r * 0.55 + 4, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        // 礁石本體
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.moveTo(-reef.r, 4);
+        ctx.lineTo(-reef.r * 0.5, -reef.r * 0.75);
+        ctx.lineTo(reef.r * 0.2, -reef.r * 0.9);
+        ctx.lineTo(reef.r, 3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#475569';
+        ctx.beginPath();
+        ctx.moveTo(-reef.r * 0.4, -reef.r * 0.7);
+        ctx.lineTo(reef.r * 0.2, -reef.r * 0.9);
+        ctx.lineTo(reef.r * 0.45, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // 5. 投石落點預警圈與墜落石塊
+      state.rocks.forEach(r => {
+        const progress = 1 - r.timer / r.maxTimer;
+        ctx.save();
+        ctx.translate(r.x, r.y);
+        ctx.fillStyle = `rgba(239, 68, 68, ${0.15 + progress * 0.35})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, r.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, r.radius * (1 - progress * 0.65), 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 下墜中的巨石
+        const fallY = -180 * (1 - progress);
+        ctx.fillStyle = '#57534e';
+        ctx.beginPath();
+        ctx.arc(0, fallY, 10 + progress * 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // 6. 繪製草船本體（含稻草人、插滿的箭、傾斜角度與火焰）
+      drawStrawBoat(timeSec);
+
+      // 7. 繪製飛行中的羽箭與火箭
+      state.projectiles.forEach(p => {
+        const angle = Math.atan2(p.vy, p.vx);
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(angle);
+        if (p.type === 'fire') {
+          // 火箭火光尾跡
+          ctx.strokeStyle = 'rgba(251, 146, 60, 0.85)';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(-22, 0);
+          ctx.lineTo(8, 0);
+          ctx.stroke();
+          ctx.fillStyle = '#fef08a';
+          ctx.beginPath();
+          ctx.arc(10, 0, 5, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // 普通羽箭
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(-14, 0);
+          ctx.lineTo(10, 0);
+          ctx.stroke();
+          // 箭頭
+          ctx.fillStyle = '#f8fafc';
+          ctx.beginPath();
+          ctx.moveTo(13, 0);
+          ctx.lineTo(7, -3);
+          ctx.lineTo(7, 3);
+          ctx.closePath();
+          ctx.fill();
+          // 箭羽
+          ctx.strokeStyle = '#fbbf24';
+          ctx.beginPath();
+          ctx.moveTo(-14, 0);
+          ctx.lineTo(-18, -3);
+          ctx.moveTo(-14, 0);
+          ctx.lineTo(-18, 3);
+          ctx.stroke();
+        }
+        ctx.restore();
+      });
+
+      // 8. 繪製濃霧層（透明度依濃霧掩護值動態變化）
+      const fogStrength = state.fog / 100;
+      if (fogStrength > 0.05) {
+        state.fogClouds.forEach(c => {
+          const grad = ctx.createRadialGradient(c.x, c.y, c.r * 0.1, c.x, c.y, c.r);
+          grad.addColorStop(0, `rgba(226, 232, 240, ${c.alpha * fogStrength * 1.15})`);
+          grad.addColorStop(1, 'rgba(226, 232, 240, 0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      // 9. 繪製粒子特效
+      state.particles.forEach(pt => {
+        ctx.fillStyle = pt.color;
+        ctx.globalAlpha = Math.max(0, pt.life);
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+
+      // 10. 繪製浮動得分與提示文字
+      state.floatingTexts.forEach(ft => {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, ft.life);
+        ctx.font = `900 ${ft.size}px "Noto Sans TC", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.lineWidth = 4;
+        ctx.strokeText(ft.text, ft.x, ft.y);
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+      });
+
+      ctx.restore();
+    }
+
+    function drawCaoCamp(timeSec) {
+      const bankH = height * 0.14;
+      ctx.fillStyle = '#090f1a';
+      ctx.fillRect(0, 0, width, bankH);
+
+      // 木柵與箭樓剪影
+      ctx.fillStyle = '#1e293b';
+      const towers = Math.max(3, Math.floor(width / 190));
+      for (let i = 0; i < towers; i++) {
+        const tx = ((i + 0.5) * width) / towers;
+        ctx.fillRect(tx - 24, bankH - 32, 48, 32);
+        // 屋簷
+        ctx.beginPath();
+        ctx.moveTo(tx - 34, bankH - 30);
+        ctx.lineTo(tx, bankH - 46);
+        ctx.lineTo(tx + 34, bankH - 30);
+        ctx.closePath();
+        ctx.fill();
+
+        // 搖曳火把光點
+        const flicker = 4 + Math.sin(timeSec * 12 + i) * 1.5;
+        ctx.fillStyle = 'rgba(251, 146, 60, 0.35)';
+        ctx.beginPath();
+        ctx.arc(tx - 16, bankH - 12, flicker * 2.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fde047';
+        ctx.beginPath();
+        ctx.arc(tx - 16, bankH - 12, flicker * 0.65, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1e293b';
+      }
+
+      // 曹軍旗幟文字
+      ctx.fillStyle = 'rgba(248, 250, 252, 0.65)';
+      ctx.font = 'bold 12px "Noto Serif TC", serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🚩 曹軍北岸水寨', width / 2, Math.max(16, bankH - 10));
+    }
+
+    function drawStrawBoat(timeSec) {
+      const boat = state.boat;
+      ctx.save();
+      ctx.translate(boat.x, boat.y);
+
+      // 擂鼓聲波擴散圈
+      if (boat.isDrumming) {
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.65)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, boat.drumWaveRadius % 95, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 護盾光環
+      if (state.shieldTimer > 0) {
+        ctx.strokeStyle = 'rgba(125, 211, 252, 0.85)';
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.14)';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 68, 36, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // 依平衡度實際傾斜船身（最大傾斜約 ±26 度）
+      const tiltRad = (state.balance / 100) * 0.45;
+      ctx.rotate(tiltRad);
+
+      // 掉頭水平翻轉縮放動畫
+      const flipScale = boat.facing * (boat.turnAnim > 0 ? Math.cos(boat.turnAnim * Math.PI) : 1);
+      ctx.scale(flipScale || 0.1, 1);
+
+      // 水面船影
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.beginPath();
+      ctx.ellipse(0, 14, 58, 16, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 木船船體
+      ctx.fillStyle = '#78350f';
+      ctx.strokeStyle = '#451a03';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(-54, -4);
+      ctx.quadraticCurveTo(-36, 20, 0, 20);
+      ctx.quadraticCurveTo(42, 20, 60, -6);
+      ctx.lineTo(44, -14);
+      ctx.lineTo(-42, -14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // 甲板
+      ctx.fillStyle = '#92400e';
+      ctx.fillRect(-38, -12, 76, 12);
+
+      // 繪製稻草人（上排代表面向曹軍的受箭側，下排代表背向側）
+      const topSideArrows = boat.facing === 1 ? boat.leftArrows : boat.rightArrows;
+      const botSideArrows = boat.facing === 1 ? boat.rightArrows : boat.leftArrows;
+
+      for (let i = -2; i <= 2; i++) {
+        const sx = i * 16;
+        // 上排稻草人
+        ctx.fillStyle = '#d97706';
+        ctx.fillRect(sx - 5, -22, 10, 13);
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.arc(sx, -25, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 視覺呈現插在稻草人上的羽箭
+      ctx.strokeStyle = '#fef3c7';
+      ctx.lineWidth = 1.5;
+      for (let a = 0; a < topSideArrows; a++) {
+        const ax = -34 + (a * 68) / 28;
+        ctx.beginPath();
+        ctx.moveTo(ax, -16);
+        ctx.lineTo(ax - 3, -29 - (a % 3) * 3);
+        ctx.stroke();
+      }
+      for (let a = 0; a < botSideArrows; a++) {
+        const ax = -34 + (a * 68) / 28;
+        ctx.beginPath();
+        ctx.moveTo(ax, 8);
+        ctx.lineTo(ax + 3, 21 + (a % 3) * 3);
+        ctx.stroke();
+      }
+
+      // 船頭標示（指向前進朝向）
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.moveTo(56, -6);
+      ctx.lineTo(46, -11);
+      ctx.lineTo(46, -1);
+      ctx.closePath();
+      ctx.fill();
+
+      // 船篷與小旗
+      ctx.fillStyle = '#b45309';
+      ctx.fillRect(-14, -10, 28, 12);
+      ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.moveTo(0, -10);
+      ctx.lineTo(0, -34);
+      ctx.lineTo(-14, -28);
+      ctx.lineTo(0, -22);
+      ctx.fill();
+
+      // 起火動畫
+      if (boat.isOnFire) {
+        const fSize = 12 + Math.sin(timeSec * 20) * 4;
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+        ctx.beginPath();
+        ctx.arc(-12, -16, fSize, 0, Math.PI * 2);
+        ctx.arc(14, -14, fSize * 0.85, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(253, 224, 71, 0.9)';
+        ctx.beginPath();
+        ctx.arc(-12, -14, fSize * 0.5, 0, Math.PI * 2);
+        ctx.arc(14, -12, fSize * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    /*************************************************************************
+     * 12. HUD 介面同步更新
+     *************************************************************************/
+    function updateHUD() {
+      // 箭數進度
+      arrowCountText.textContent = state.arrows.toLocaleString();
+      const arrowPct = Math.min(100, (state.arrows / state.targetArrows) * 100);
+      arrowProgressBar.style.width = `${arrowPct}%`;
+
+      // 連擊倍率
+      if (state.combo >= 3) {
+        const mult = Math.min(2.5, 1 + Math.floor(state.combo / 5) * 0.25);
+        comboBadge.textContent = `連擊 ${state.combo} (x${mult.toFixed(2)})`;
+        comboBadge.classList.remove('hidden');
+      } else {
+        comboBadge.classList.add('hidden');
+      }
+
+      // HP
+      const hpVal = Math.ceil(state.hp);
+      hpText.textContent = hpVal;
+      hpBar.style.width = `${hpVal}%`;
+      hpBox.classList.toggle('danger-pulse', hpVal <= 30 || state.boat.isOnFire);
+
+      // 平衡度指針（-100 ~ +100 對應 0% ~ 100%）
+      const balPct = Math.max(2, Math.min(98, 50 + state.balance * 0.48));
+      balancePointer.style.left = `calc(${balPct}% - 5px)`;
+      const absBal = Math.abs(state.balance);
+      if (absBal >= 65) {
+        balanceStateText.textContent = state.balance < 0 ? '⚠️左傾危險' : '⚠️右傾危險';
+        balanceStateText.className = 'text-rose-400 font-black';
+        balanceBox.classList.add('danger-pulse');
+      } else if (absBal >= 38) {
+        balanceStateText.textContent = state.balance < 0 ? '偏左' : '偏右';
+        balanceStateText.className = 'text-amber-300';
+        balanceBox.classList.remove('danger-pulse');
+      } else {
+        balanceStateText.textContent = '平穩';
+        balanceStateText.className = 'text-emerald-300';
+        balanceBox.classList.remove('danger-pulse');
+      }
+
+      // 濃霧值
+      const fogVal = Math.round(state.fog);
+      fogText.textContent = `${fogVal}%`;
+      fogBar.style.width = `${fogVal}%`;
+      fogBox.classList.toggle('danger-pulse', fogVal <= 30);
+
+      // 剩餘時間
+      timerText.textContent = `${Math.ceil(state.timeLeft)}s`;
+
+      // 右上角即時狀態標籤
+      let badgesHTML = '';
+      if (state.boat.isOnFire) {
+        badgesHTML += `<div class="px-2.5 py-1 rounded-full bg-red-600/90 text-white text-xs font-black shadow">🔥 船身著火中！</div>`;
+      }
+      if (state.frenzyTimer > 0) {
+        badgesHTML += `<div class="px-2.5 py-1 rounded-full bg-amber-500/90 text-slate-950 text-xs font-black shadow">✨ 借箭加倍 ${state.frenzyTimer.toFixed(1)}s</div>`;
+      }
+      if (state.shieldTimer > 0) {
+        badgesHTML += `<div class="px-2.5 py-1 rounded-full bg-sky-500/90 text-slate-950 text-xs font-black shadow">🛡️ 軍情護盾 ${state.shieldTimer.toFixed(1)}s</div>`;
+      }
+      statusBadges.innerHTML = badgesHTML;
+    }
+
+    /*************************************************************************
+     * 13. 遊戲結束與動態「借箭戰報」生成
+     *************************************************************************/
+    function endGame(reason) {
+      gameRunning = false;
+      hideQuizCard();
+
+      const accuracy = state.quizTotalCount > 0
+        ? Math.round((state.quizCorrectCount / state.quizTotalCount) * 100)
+        : 100;
+
+      let title = '';
+      let subtitle = '';
+      let report = '';
+      let rank = 'B 級';
+
+      if (reason === 'win') {
+        soundFX.playVictory();
+        title = '大獲全勝・十萬箭入庫！';
+        subtitle = `成功在濃霧散去前借滿 ${state.targetArrows.toLocaleString()} 支羽箭！`;
+        if (accuracy >= 80 && state.hp >= 65) rank = 'S 級（神機妙算）';
+        else if (accuracy >= 60) rank = 'A 級（智勇雙全）';
+        else rank = 'B 級（驚險達標）';
+
+        report = `本戰你化身諸葛軍師，於「${state.cfg.label}」中沉著調度草船，創下最高 ${state.maxCombo} 連擊！` +
+          (state.hadFireCrisis ? '面對曹軍火箭威脅仍能臨危不亂、化險為夷；' : '全程避開火攻威脅，船體保存良好；') +
+          `國語即時判斷答對率達 ${accuracy}%，真正做到文武雙全、滿載而歸！`;
+      } else {
+        soundFX.playDamage();
+        rank = state.arrows >= state.targetArrows * 0.6 ? 'B 級（功敗垂成）' : 'C 級（再接再厲）';
+        if (reason === 'capsize') {
+          title = '驚險翻船・遺憾撤退';
+          subtitle = '單側受箭過重導致草船傾覆江中！';
+          report = `你已奮勇借得 ${state.arrows.toLocaleString()} 支箭，可惜單側稻草人受箭過多未及時掉頭，導致船身傾覆。下次記得觀察「船身平衡」指標，快傾斜時立刻按掉頭鍵！`;
+        } else if (reason === 'destroyed') {
+          title = '草船焚毀・緊急撤離';
+          subtitle = '船體耐久度歸零，被迫放棄借箭！';
+          report = `曹軍的火箭、投石與江中暗礁攻勢猛烈！你共借得 ${state.arrows.toLocaleString()} 支箭，下次著火時記得快速答對國語形音義題目，召喚「水霧滅火」就能化險為夷！`;
+        } else {
+          title = '江霧散盡・鳴金收兵';
+          subtitle = '時間已到，曹操察覺有詐被迫返航！';
+          report = `天色漸亮、江霧散去，你在時間內共借得 ${state.arrows.toLocaleString()} 支箭。下次可多利用「按住擂鼓」吸引箭雨，並答對成語題啟動借箭加倍，就能輕鬆突破十萬大關！`;
+        }
+      }
+
+      document.getElementById('resultTitle').textContent = title;
+      document.getElementById('resultSubtitle').textContent = subtitle;
+      document.getElementById('resArrows').textContent = state.arrows.toLocaleString();
+      document.getElementById('resAccuracy').textContent = `${accuracy}%`;
+      document.getElementById('resRank').textContent = rank;
+      document.getElementById('resReportText').textContent = report;
+
+      // 載入戰後修辭／成語小挑戰
+      const challenge = RESULT_RHETORIC_CHALLENGES[Math.floor(Math.random() * RESULT_RHETORIC_CHALLENGES.length)];
+      document.getElementById('resRhetoricTag').textContent = challenge.tag;
+      document.getElementById('resRhetoricText').textContent = challenge.sentence;
+      const bonusOptions = document.getElementById('resBonusOptions');
+      const bonusFeedback = document.getElementById('resBonusFeedback');
+      bonusOptions.innerHTML = '';
+      bonusFeedback.classList.add('hidden');
+
+      challenge.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'game-btn py-2 px-3 rounded-xl bg-amber-100 hover:bg-amber-200 border border-amber-700/50 text-stone-900 font-bold text-xs sm:text-sm';
+        btn.textContent = opt;
+        btn.onclick = () => {
+          soundFX.init();
+          const ok = idx === challenge.answer;
+          if (ok) soundFX.playCorrect();
+          else soundFX.playWrong();
+          bonusFeedback.textContent = ok ? `✅ ${challenge.feedback}` : `💡 小提醒：正確答案是「${challenge.options[challenge.answer]}」。${challenge.feedback}`;
+          bonusFeedback.className = `text-xs font-bold mt-2 ${ok ? 'text-emerald-800' : 'text-amber-900'}`;
+          bonusFeedback.classList.remove('hidden');
+        };
+        bonusOptions.appendChild(btn);
+      });
+
+      resultOverlay.classList.remove('hidden');
+    }
+
+    /*************************************************************************
+     * 14. 動畫主迴圈與事件綁定
+     *************************************************************************/
+    function gameLoop(timestamp) {
+      if (!lastTimestamp) lastTimestamp = timestamp;
+      const dt = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+
+      if (gameRunning) {
+        updateGame(dt);
+        renderGame();
+      }
+      requestAnimationFrame(gameLoop);
+    }
+
+    function startGame() {
+      soundFX.init();
+      startOverlay.classList.add('hidden');
+      resultOverlay.classList.add('hidden');
+      hudBar.classList.remove('hidden');
+      controlsBar.classList.remove('hidden');
+      resizeCanvas();
+      initGameState();
+      gameRunning = true;
+      lastTimestamp = performance.now();
+    }
+
+    // 選擇年級按鈕樣式切換
+    function selectGrade(grade) {
+      selectedGrade = grade;
+      if (grade === 'mid') {
+        btnMidGrade.className = 'grade-btn game-btn py-2.5 px-3 rounded-xl border-2 font-bold text-sm transition bg-emerald-700 text-white border-emerald-400';
+        btnHighGrade.className = 'grade-btn game-btn py-2.5 px-3 rounded-xl border-2 font-bold text-sm transition bg-stone-200 text-stone-700 border-stone-400';
+      } else {
+        btnHighGrade.className = 'grade-btn game-btn py-2.5 px-3 rounded-xl border-2 font-bold text-sm transition bg-red-700 text-white border-amber-400';
+        btnMidGrade.className = 'grade-btn game-btn py-2.5 px-3 rounded-xl border-2 font-bold text-sm transition bg-stone-200 text-stone-700 border-stone-400';
+      }
+    }
+
+    btnMidGrade.addEventListener('click', () => selectGrade('mid'));
+    btnHighGrade.addEventListener('click', () => selectGrade('high'));
+    startGameBtn.addEventListener('click', startGame);
+    playAgainBtn.addEventListener('click', startGame);
+    changeGradeBtn.addEventListener('click', () => {
+      resultOverlay.classList.add('hidden');
+      startOverlay.classList.remove('hidden');
+    });
+
+    muteBtn.addEventListener('click', () => {
+      soundFX.init();
+      const muted = soundFX.toggleMute();
+      muteBtn.textContent = muted ? '🔇' : '🔊';
+    });
+
+    // 掉頭按鈕
+    turnBtn.addEventListener('click', triggerTurnaround);
+
+    // 擂鼓按鈕（支援滑鼠與觸控長按）
+    const startDrumHold = (e) => { e.preventDefault(); soundFX.init(); isDrumBtnHeld = true; };
+    const endDrumHold = () => { isDrumBtnHeld = false; };
+    drumBtn.addEventListener('mousedown', startDrumHold);
+    drumBtn.addEventListener('touchstart', startDrumHold, { passive: false });
+    window.addEventListener('mouseup', endDrumHold);
+    window.addEventListener('touchend', endDrumHold);
+    window.addEventListener('touchcancel', endDrumHold);
+
+    // 鍵盤操作（移動、掉頭、擂鼓、快速答題 1/2/3）
+    window.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+      if (!gameRunning) return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        triggerTurnaround();
+      }
+      if (state.activeQuiz) {
+        if (e.key === '1') answerQuiz(0);
+        if (e.key === '2') answerQuiz(1);
+        if (e.key === '3') answerQuiz(2);
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+    });
+
+    // Canvas 滑鼠與觸控拖曳走位
+    function getCanvasCoords(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+      };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (!gameRunning) return;
+      soundFX.init();
+      pointerDragging = true;
+      pointerTarget = getCanvasCoords(e.clientX, e.clientY);
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (pointerDragging && gameRunning) {
+        pointerTarget = getCanvasCoords(e.clientX, e.clientY);
+      }
+    });
+    window.addEventListener('mouseup', () => { pointerDragging = false; });
+
+    canvas.addEventListener('touchstart', (e) => {
+      if (!gameRunning) return;
+      e.preventDefault();
+      soundFX.init();
+      pointerDragging = true;
+      const t = e.touches[0];
+      pointerTarget = getCanvasCoords(t.clientX, t.clientY);
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (!pointerDragging || !gameRunning) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      pointerTarget = getCanvasCoords(t.clientX, t.clientY);
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => { pointerDragging = false; });
+    window.addEventListener('resize', resizeCanvas);
+
+    // 視窗載入後啟動主迴圈
+    window.onload = function () {
+      resizeCanvas();
+      requestAnimationFrame(gameLoop);
+    };
+  </script>
+</body>
+</html>
